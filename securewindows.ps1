@@ -14,11 +14,11 @@ $chartPath = "$scriptRoot\security_charts.png"
 $csvPath = "$scriptRoot\security_details.csv"
 $fecha = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $global:score = 0
-$global:maxScore = 0  # Se calculará automáticamente
+$global:maxScore = 0
 $global:securityResults = @{}
 $global:detailedFindings = @()
 
-# Calculamos el puntaje máximo teórico
+# Calcular el puntaje máximo teórico
 $maxScores = @{
     "Antivirus" = @{
         "Defender Status" = 5
@@ -37,8 +37,8 @@ $maxScores = @{
     }
     "Network" = @{
         "Risky Ports" = 15
-        "Network Interface" = 2  # Puntos por interfaz
-        "DNS Servers" = 2        # Puntos por interfaz
+        "Network Interface" = 2
+        "DNS Servers" = 2
     }
     "Hardening" = @{
         "Tamper Protection" = 15
@@ -54,7 +54,6 @@ $maxScores = @{
     }
 }
 
-# Calcular el puntaje máximo teórico
 $global:maxScore = 0
 foreach ($category in $maxScores.Keys) {
     foreach ($check in $maxScores[$category].Keys) {
@@ -62,9 +61,17 @@ foreach ($category in $maxScores.Keys) {
     }
 }
 
-# Añadir puntos adicionales por interfaces de red (estimado promedio de 3 interfaces)
-$global:maxScore += (3 * $maxScores["Network"]["Network Interface"])
-$global:maxScore += (3 * $maxScores["Network"]["DNS Servers"])
+# Get the actual number of active network interfaces
+$activeInterfaces = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }
+
+# Add points based on the actual number of interfaces
+$global:maxScore += ($activeInterfaces.Count * $maxScores["Network"]["Network Interface"])
+
+# Similarly, for DNS servers, get the actual number of interfaces with DNS servers configured
+$dnsInterfaces = Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses -ne $null }
+
+# Add points for DNS server configuration based on the actual number of DNS interfaces
+$global:maxScore += ($dnsInterfaces.Count * $maxScores["Network"]["DNS Servers"])
 
 # Enhanced Logging Function
 function Write-SecurityLog {
@@ -101,20 +108,17 @@ function Add-Result {
     if (-not $global:securityResults.ContainsKey($Category)) {
         $global:securityResults[$Category] = @{
             Total = 0
-            MaxPossible = 0  # Nueva propiedad para almacenar el máximo posible
+            MaxPossible = 0 
             Scored = 0
             Results = @()
         }
     }
     
-    # Actualizamos el puntaje obtenido
     $global:securityResults[$Category].Scored += $Puntos
     
-    # Actualizamos el máximo posible para esta categoría
     if ($maxScores[$Category][$CheckName]) {
         $global:securityResults[$Category].MaxPossible += $maxScores[$Category][$CheckName]
     } else {
-        # Para comprobaciones dinámicas (como interfaces de red)
         $global:securityResults[$Category].MaxPossible += $Puntos
     }
     
@@ -133,9 +137,6 @@ function Add-Result {
     Write-SecurityLog -Message "$Category - $CheckName : $Mensaje ($Estado)" -Level $Estado
 }
 
-# ... (resto de las funciones permanecen iguales, solo se actualiza el puntaje máximo)
-
-# En la función Generate-ComprehensiveReport, actualizamos los umbrales para el puntaje
 function Test-AdvancedSecurityFeatures {
     # Comprehensive Antivirus Check
     try {
@@ -667,7 +668,7 @@ function Generate-ComprehensiveReport {
        $(
     foreach ($category in $global:securityResults.Keys) {
         $categoryScore = $global:securityResults[$category].Scored
-        $categoryMax = $global:securityResults[$category].MaxPossible  # Usamos MaxPossible en lugar de Total
+        $categoryMax = $global:securityResults[$category].MaxPossible
         $categoryPercentage = [math]::Round(($categoryScore/$categoryMax)*100)
         
         @"
