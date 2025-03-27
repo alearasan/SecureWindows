@@ -234,7 +234,7 @@ function Test-SystemHardening {
     try {
         $exploitProtection = Get-MpComputerStatus
 
-        if ($exploitProtection.IsTamperProtectionEnabled) {
+        if ($exploitProtection.IsTamperProtected) {
             Add-Result -Category "Hardening" -CheckName "Tamper Protection" -Estado "ok" -Mensaje "Windows Defender Tamper Protection Enabled" -Puntos 15 -Evidence $exploitProtection
         } else {
             Add-Result -Category "Hardening" -CheckName "Tamper Protection" -Estado "warn" -Mensaje "Tamper Protection Disabled" -Puntos 5 -Recomendacion "Enable Tamper Protection in Windows Security" -Evidence $exploitProtection
